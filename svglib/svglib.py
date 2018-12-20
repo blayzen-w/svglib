@@ -544,27 +544,27 @@ class SvgRenderer:
             item = self.renderG(n)
         elif name == 'a':
             item = self.renderA(n)
-            parent.add(item)
+            parent.add(item, nid)
         elif name == 'g':
             display = n.getAttribute("display")
             item = self.renderG(n, clipping=clipping)
             if display != "none":
-                parent.add(item)
+                parent.add(item, nid)
         elif name == "style":
             self.renderStyle(n)
         elif name == "symbol":
             item = self.renderSymbol(n)
-            parent.add(item)
+            parent.add(item, nid)
         elif name == "use":
             item = self.renderUse(n, clipping=clipping)
-            parent.add(item)
+            parent.add(item, nid)
         elif name == "clipPath":
             item = self.renderG(n)
         elif name in self.handled_shapes:
             display = n.getAttribute("display")
             item = self.shape_converter.convertShape(name, n, clipping)
             if item and display != "none":
-                parent.add(item)
+                parent.add(item, nid)
         else:
             ignored = True
             logger.debug("Ignoring node: %s" % name)
@@ -910,6 +910,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
 
     def convertPath(self, node):
         d = node.getAttribute('d')
+        nid = node.getAttribute('id')
         if not d:
             return None
         normPath = normalise_svg_path(d)
@@ -1066,7 +1067,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
             gr.add(closed_path)
             path.fillColor = None
 
-        gr.add(path)
+        gr.add(path, nid)
         return gr
 
     def convertImage(self, node):
