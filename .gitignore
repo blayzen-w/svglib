@@ -17,3 +17,6 @@ env/
 .workon
 dist/
 .idea/
+tests/samples/wikipedia/*[.pdf, .svg]
+tests/samples/W3C_SVG_12_TinyTestSuite*
+tests/samples/misc/*.pdf
