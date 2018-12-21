@@ -29,6 +29,7 @@ import subprocess
 import sys
 from collections import defaultdict, namedtuple
 from functools import partial
+from reportlab.graphics.renderPDF import _PDFRenderer
 
 from reportlab.pdfbase.pdfmetrics import registerFont, stringWidth
 from reportlab.pdfbase.ttfonts import TTFError, TTFont
@@ -532,7 +533,7 @@ class SvgRenderer:
 
     def renderNode(self, node, parent=None):
         n = NodeTracker(node)
-        nid = n.getAttribute("id")
+        nid = n.getAttribute("id") or None
         ignored = False
         item = None
         name = node_name(node)
@@ -564,7 +565,7 @@ class SvgRenderer:
             display = n.getAttribute("display")
             item = self.shape_converter.convertShape(name, n, clipping)
             if item and display != "none":
-                parent.add(item, nid)
+                parent.add(item)
         else:
             ignored = True
             logger.debug("Ignoring node: %s" % name)
@@ -1103,7 +1104,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
                 logger.error("Unable to read the image %s. Skipping..." % img.path)
                 return None
         group = Group(img)
-        group.translate(0, (x + height) * 2)
+        group.translate(0, (y + height) * 2)
         group.scale(1, -1)
         return group
 
@@ -1221,7 +1222,7 @@ def svg2rlg(path, **kwargs):
         return
 
     # convert to a RLG drawing
-    svgRenderer = SvgRenderer(path,**kwargs)
+    svgRenderer = SvgRenderer(path, **kwargs)
     drawing = svgRenderer.render(svg)
 
     # remove unzipped .svgz file (.svg)
@@ -1270,5 +1271,19 @@ def monkeypatch_reportlab():
         original_drawPath(self, path, **kwargs)
         self._fillMode = current
     Canvas.drawPath = patchedDrawPath
+
+    # Patch _PDFRenderer.drawImage to support image formats with transparent backgrounds
+    def drawImage(self, image):
+        path = image.path
+        # currently not implemented in other renderers
+        if path and (hasattr(path,'mode') or os.path.exists(image.path)):
+            self._canvas.drawImage(
+                path,
+                image.x, image.y,
+                image.width, image.height,
+                mask='auto'
+            )
+
+    _PDFRenderer.drawImage = drawImage
 
 monkeypatch_reportlab()
