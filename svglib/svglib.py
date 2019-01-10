@@ -565,7 +565,7 @@ class SvgRenderer:
             display = n.getAttribute("display")
             item = self.shape_converter.convertShape(name, n, clipping)
             if item and display != "none":
-                parent.add(item)
+                parent.add(item, nid)
         else:
             ignored = True
             logger.debug("Ignoring node: %s" % name)
