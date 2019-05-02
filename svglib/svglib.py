@@ -46,6 +46,7 @@ from lxml import etree
 import cssselect2
 import tinycss2
 
+from svglib.document import Layer
 from .utils import (
     bezier_arc_from_end_points, convert_quadratic_to_cubic_path,
     normalise_svg_path,
@@ -511,7 +512,7 @@ class SvgRenderer:
     transforming it into a ReportLab Drawing instance.
     """
 
-    def __init__(self, path=None,color_converter=None):
+    def __init__(self, path=None, color_converter=None):
         self.attrConverter = Svg2RlgAttributeConverter(color_converter=color_converter)
         self.shape_converter = Svg2RlgShapeConverter(path,self.attrConverter)
         self.handled_shapes = self.shape_converter.get_handled_shapes()
@@ -559,12 +560,14 @@ class SvgRenderer:
         elif name == "use":
             item = self.renderUse(n, clipping=clipping)
             parent.add(item, nid)
-        elif name == "clipPath":
+        elif name in ["clipPath", "clippath", ]:
             item = self.renderG(n)
         elif name in self.handled_shapes:
             display = n.getAttribute("display")
             item = self.shape_converter.convertShape(name, n, clipping)
             if item and display != "none":
+                #if isinstance(item, Group):
+                #    nid = None
                 parent.add(item, nid)
         else:
             ignored = True
@@ -586,9 +589,13 @@ class SvgRenderer:
         """
         def get_path_from_node(node):
             for child in node.getchildren():
-                if node_name(child) == 'path':
-                    group = self.shape_converter.convertShape('path', NodeTracker(child))
-                    return group.contents[-1]
+                _node_name = node_name(child)
+                if _node_name in ['path', ]:  # 'ellipse' not currently supported by reportlab
+                    if _node_name == 'path':
+                        group = self.shape_converter.convertShape(_node_name, NodeTracker(child))
+                        return group.contents[-1]
+                    else:
+                        return self.shape_converter.convertEllipse(NodeTracker(child))
                 else:
                     return get_path_from_node(child)
 
@@ -656,12 +663,19 @@ class SvgRenderer:
                 if view_box.width != width:
                     x_scale = width / view_box.width
                 group.scale(x_scale, y_scale)
+
+        #clipping = self.get_clippath(node)
+        #if clipping:
+        #    group.add(clipping)
         return group
 
     def renderG(self, node, clipping=None, display=1):
         getAttr = node.getAttribute
         id, transform = map(getAttr, ("id", "transform"))
-        gr = Group()
+        if id:
+            gr = Layer()
+        else:
+            gr = Group()
         if clipping:
             gr.add(clipping)
         for child in node.getchildren():
@@ -740,6 +754,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
     """Converter from SVG shapes to RLG (ReportLab Graphics) shapes."""
 
     def convertShape(self, name, node, clipping=None):
+        nid = getattr(node, 'id')
         method_name = "convert%s" % name.capitalize()
         shape = getattr(self, method_name)(node)
         if not shape:
@@ -756,7 +771,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
                 self.applyTransformOnGroup(transform, group)
             if clipping:
                 group.add(clipping)
-            group.add(shape)
+            group.add(shape, nid)
             return group
 
     def convertLine(self, node):
@@ -1217,6 +1232,9 @@ def svg2rlg(path, **kwargs):
     try:
         doc = etree.parse(path, parser=parser)
         svg = doc.getroot()
+
+        #traverse(svg)
+
     except Exception as exc:
         logger.error("Failed to load input file! (%s)" % exc)
         return
@@ -1230,6 +1248,15 @@ def svg2rlg(path, **kwargs):
         os.remove(path)
 
     return drawing
+
+
+# debug util
+def traverse(s):
+    for child in s.getchildren():
+        try:
+            traverse(child)
+        except:
+            pass
 
 
 def node_name(node):
