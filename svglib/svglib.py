@@ -1102,7 +1102,7 @@ class Svg2RlgShapeConverter(SvgShapeConverter):
         match = re.match(magic_re, xlink_href)
         if match:
             img_format = match.groups()[0]
-            image_data = base64.decodestring(xlink_href[(match.span(0)[1] + 1):].encode('ascii'))
+            image_data = base64.decodebytes(xlink_href[(match.span(0)[1] + 1):].encode('ascii'))
             _, path = tempfile.mkstemp(suffix='.%s' % img_format)
             with open(path, 'wb') as fh:
                 fh.write(image_data)
